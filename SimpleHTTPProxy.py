@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 import sys
-import urllib2
+import httplib
+from urlparse import urlsplit
 from threading import Lock
 from SocketServer import ThreadingMixIn
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
@@ -10,12 +11,6 @@ import gzip
 
 class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     pass
-
-
-class HTTPNoRedirectHandler(urllib2.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, hdrs, newurl):
-        url = req.get_full_url()
-        raise urllib2.HTTPError(url, code, msg, hdrs, fp)
 
 
 class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
@@ -36,20 +31,17 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         # "The Via general-header field MUST be used by gateways and proxies ..." [RFC 2616]
         self.headers['Via'] = self.get_via_string(original=self.headers.get('Via'))
 
-        if self.command == 'POST':
-            length = int(self.headers['Content-Length'])
-            postdata = self.rfile.read(length)
-            req = urllib2.Request(self.path, data=postdata, headers=self.headers)
+        requrl = urlsplit(self.path)
+        conn = httplib.HTTPConnection(requrl.netloc)
+        reqpath = "%s?%s" % (requrl.path, requrl.query)
+        content_length = int(self.headers.get('Content-Length', 0))
+        if content_length > 0:
+            body = self.rfile.read(content_length)
+            conn.request(self.command, reqpath, body, headers=dict(self.headers))
         else:
-            req = urllib2.Request(self.path, headers=self.headers)
-        opener = urllib2.build_opener(HTTPNoRedirectHandler())
-        try:
-            res = opener.open(req)
-        except urllib2.HTTPError as e:
-            res = e
-
-        # "The Via general-header field MUST be used by gateways and proxies ..." [RFC 2616]
-        res.headers['Via'] = self.get_via_string(original=res.headers.get('Via'))
+            conn.request(self.command, reqpath, headers=dict(self.headers))
+        res = conn.getresponse()
+        setattr(res, 'headers', res.msg)    # just hack
 
         is_gziped = res.headers.get('Content-Encoding') == 'gzip'
         data = res.read()
@@ -59,6 +51,11 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
                 body = f.read()
         else:
             body = data
+
+        conn.close()
+
+        # "The Via general-header field MUST be used by gateways and proxies ..." [RFC 2616]
+        res.headers['Via'] = self.get_via_string(original=res.headers.get('Via'))
 
         replaced_body = self.response_handler(res, body)
         if replaced_body:
@@ -71,7 +68,7 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
                 data = replaced_body
             body = replaced_body
 
-        self.send_response(res.code, res.msg)
+        self.send_response(res.status, res.reason)
         for k in res.headers:
             self.send_header(k, res.headers[k])
         self.end_headers()
@@ -81,8 +78,6 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
 
             with Lock():
                 self.save_handler(res, body)
-
-        res.close()
 
     def get_via_string(self, original=None):
         if self.protocol_version.startswith('HTTP/'):
