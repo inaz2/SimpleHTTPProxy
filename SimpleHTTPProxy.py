@@ -8,9 +8,16 @@ from SocketServer import ThreadingMixIn
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 from cStringIO import StringIO
 import gzip
+import socket
 
 class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
-    pass
+    # listening on IPv4 address
+    address_family = socket.AF_INET
+
+
+class ThreadingHTTPServer6(ThreadingHTTPServer):
+    # listening on IPv6 address
+    address_family = socket.AF_INET6
 
 
 class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
@@ -123,3 +130,6 @@ def test(HandlerClass=SimpleHTTPProxyHandler, ServerClass=ThreadingHTTPServer, p
 
 if __name__ == '__main__':
     test()
+
+    # use below for listening on IPv6 address
+    # test(ServerClass=ThreadingHTTPServer6)
