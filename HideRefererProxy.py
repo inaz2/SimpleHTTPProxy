@@ -3,9 +3,9 @@
 from SimpleHTTPProxy import SimpleHTTPProxyHandler, test
 
 class HideRefererProxyHandler(SimpleHTTPProxyHandler):
-    def request_handler(self):
-        self.headers['Referer'] = self.path
-        # del self.headers['Referer']
+    def request_handler(self, req, body):
+        req.headers['Referer'] = req.path
+        # del req.headers['Referer']
 
 
 if __name__ == '__main__':

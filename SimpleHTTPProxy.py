@@ -31,24 +31,31 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         self.do_SPAM()
 
     def do_SPAM(self):
-        is_resolved = self.request_handler()
-        if is_resolved:
-            return
-
-        # "The Via general-header field MUST be used by gateways and proxies ..." [RFC 2616]
-        self.headers['Via'] = self.get_via_string(original=self.headers.get('Via'))
-
-        requrl = urlsplit(self.path)
-        conn = httplib.HTTPConnection(requrl.netloc)
-        reqpath = "%s?%s" % (requrl.path, requrl.query)
-        content_length = int(self.headers.get('Content-Length', 0))
+        req = self
+        content_length = int(req.headers.get('Content-Length', 0))
         if content_length > 0:
             body = self.rfile.read(content_length)
-            conn.request(self.command, reqpath, body, headers=dict(self.headers))
         else:
-            conn.request(self.command, reqpath, headers=dict(self.headers))
+            body = None
+
+        replaced_body = self.request_handler(req, body)
+        if replaced_body is True:
+            return
+        elif replaced_body is not None:
+            body = replaced_body
+
+        # "The Via general-header field MUST be used by gateways and proxies ..." [RFC 2616]
+        req.headers['Via'] = self.get_via_string(original=req.headers.get('Via'))
+
+        u = urlsplit(req.path)
+        conn = httplib.HTTPConnection(u.netloc)
+        selector = "%s?%s" % (u.path, u.query)
+        if body:
+            conn.request(req.command, selector, body, headers=dict(req.headers))
+        else:
+            conn.request(req.command, selector, headers=dict(req.headers))
         res = conn.getresponse()
-        setattr(res, 'headers', res.msg)    # just hack
+        res.headers = res.msg    # add an alias so that res has the same interface as req
 
         is_gziped = res.headers.get('Content-Encoding') == 'gzip'
         data = res.read()
@@ -64,8 +71,10 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         # "The Via general-header field MUST be used by gateways and proxies ..." [RFC 2616]
         res.headers['Via'] = self.get_via_string(original=res.headers.get('Via'))
 
-        replaced_body = self.response_handler(res, body)
-        if replaced_body:
+        replaced_body = self.response_handler(req, res, body)
+        if replaced_body is True:
+            return
+        elif replaced_body is not None:
             if is_gziped:
                 io = StringIO()
                 with gzip.GzipFile(fileobj=io, mode='wb') as f:
@@ -84,7 +93,7 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
             self.wfile.write(data)
 
             with Lock():
-                self.save_handler(res, body)
+                self.save_handler(req, res, body)
 
     def get_via_string(self, original=None):
         if self.protocol_version.startswith('HTTP/'):
@@ -97,17 +106,19 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         else:
             return via_string
 
-    def request_handler(self):
+    def request_handler(self, req, body):
         # override here
-        # return True if the response resolved, i.e., if the proxy should not connect to the upstream server
+        # return True if you sent the response here and the proxy should not connect to the upstream server
+        # return replaced body (other than None and True) if you did
         pass
 
-    def response_handler(self, res, body):
+    def response_handler(self, req, res, body):
         # override here
-        # return replaced body if you did
+        # return True if you sent the response here and the proxy should not connect to the upstream server
+        # return replaced body (other than None and True) if you did
         pass
 
-    def save_handler(self, res, body):
+    def save_handler(self, req, res, body):
         # override here
         # this handler is called after the proxy responded to the client
         pass

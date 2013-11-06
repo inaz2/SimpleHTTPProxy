@@ -13,7 +13,7 @@ class SaveImagesProxyHandler(SimpleHTTPProxyHandler):
             fpath = os.path.join(fdir, fname)
         return fpath
 
-    def save_handler(self, res, body):
+    def save_handler(self, req, res, body):
         content_type = res.headers.get('Content-Type', '')
         if content_type.startswith('image/'):
             fpath = self.url2path(self.path)
