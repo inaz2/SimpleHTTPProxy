@@ -14,7 +14,8 @@ class SSLStripProxyHandler(SimpleHTTPProxyHandler):
     def response_handler(self, req, res, body):
         location = res.headers.get('Location', '')
         if location.startswith('https://'):
-            self.forward_table["http://" + location[8:]] = location
+            http_url = "http://" + location[len('https://'):]
+            self.forward_table[http_url] = location
 
             req.command = 'GET'
             req.path = location
@@ -31,10 +32,10 @@ class SSLStripProxyHandler(SimpleHTTPProxyHandler):
 
             content_type = res.headers.get('Content-Type', '')
             if content_type.startswith('text/html') or content_type.startswith('text/css') or content_type.startswith('text/javascript'):
-                re_url = r'https://([\w\-.~%!$&\'()*+,;=:@/?#]+)'    # based on RFC 3986
+                re_url = r'((["\'])\s*)https://([\w\-.~%!$&\'()*+,;=:@/?#]+)(\s*\2)'    # based on RFC 3986
                 for m in re.finditer(re_url, body):
-                    self.forward_table["http://%s" % m.group(1)] = m.group(0)
-                body = re.sub(re_url, r'http://\1', body)
+                    self.forward_table["http://%s" % m.group(3)] = "https://%s" % m.group(3)
+                body = re.sub(re_url, r'\1http://\3\4', body)
 
             return body
 

@@ -102,7 +102,7 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
 
     def modify_via_header(self, headers):
         if self.protocol_version.startswith('HTTP/'):
-            via_string = "%s proxy" % self.protocol_version[5:]
+            via_string = "%s proxy" % self.protocol_version[len('HTTP/'):]
         else:
             via_string = "%s proxy" % self.protocol_version
 
