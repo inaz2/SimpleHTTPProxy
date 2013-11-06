@@ -38,14 +38,15 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         else:
             body = None
 
+        # RFC 2616 requirements
+        self.modify_via_header(req.headers)
+        req.headers['Connection'] = 'close'
+
         replaced_body = self.request_handler(req, body)
         if replaced_body is True:
             return
         elif replaced_body is not None:
             body = replaced_body
-
-        # "The Via general-header field MUST be used by gateways and proxies ..." [RFC 2616]
-        req.headers['Via'] = self.get_via_string(original=req.headers.get('Via'))
 
         u = urlsplit(req.path)
         conn = httplib.HTTPConnection(u.netloc)
@@ -68,8 +69,9 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
 
         conn.close()
 
-        # "The Via general-header field MUST be used by gateways and proxies ..." [RFC 2616]
-        res.headers['Via'] = self.get_via_string(original=res.headers.get('Via'))
+        # RFC 2616 requirements
+        self.modify_via_header(res.headers)
+        res.headers['Connection'] = 'close'
 
         replaced_body = self.response_handler(req, res, body)
         if replaced_body is True:
@@ -95,16 +97,17 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
             with Lock():
                 self.save_handler(req, res, body)
 
-    def get_via_string(self, original=None):
+    def modify_via_header(self, headers):
         if self.protocol_version.startswith('HTTP/'):
             via_string = "%s proxy" % self.protocol_version[5:]
         else:
             via_string = "%s proxy" % self.protocol_version
 
+        original = headers.get('Via')
         if original:
-            return original + ', ' + via_string
+            headers['Via'] = original + ', ' + via_string
         else:
-            return via_string
+            headers['Via'] = via_string
 
     def request_handler(self, req, body):
         # override here
