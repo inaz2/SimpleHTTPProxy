@@ -9,7 +9,8 @@ Features:
 - runs fast with minimum footprint
 - requires no external modules
 - supports threading
-- supports gzip decompression
+- supports gzip compression
+- supports sslstrip feature (by SSLStripProxy)
 
 
 ## Usage
@@ -29,7 +30,7 @@ When the argument is not given, SimpleHTTPProxy uses tcp/8080.
 
 ## Customize
 
-To customize, derive `SimpleHTTPProxyHandler` class and override the handler methods.
+To customize, inherit `SimpleHTTPProxyHandler` class and override the handler methods.
 
 Some examples are included:
 
@@ -44,3 +45,15 @@ You can use these proxies just as SimpleHTTPProxy:
 ```
 $ python -m SaveImagesProxy
 ```
+
+
+## sslstripping by SSLStripProxy
+
+SSLStripProxy inherits SimpleHTTPProxy and implements [sslstrip](http://www.thoughtcrime.org/software/sslstrip/)-like feature.
+
+- replace https urls to http ones in the responses and remember them
+- forward client's HTTP requests to upstream servers as HTTPS requests
+
+Also an example is included:
+
+- OffmousedownGoogleProxy: disable onmousedown URL rewriting in Google's Result Pages (HTTPS)

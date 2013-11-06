@@ -49,7 +49,10 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
             body = replaced_body
 
         u = urlsplit(req.path)
-        conn = httplib.HTTPConnection(u.netloc)
+        if u.scheme == 'https':
+            conn = httplib.HTTPSConnection(u.netloc)
+        else:
+            conn = httplib.HTTPConnection(u.netloc)
         selector = "%s?%s" % (u.path, u.query)
         if body:
             conn.request(req.command, selector, body, headers=dict(req.headers))
