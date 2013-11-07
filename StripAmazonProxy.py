@@ -5,7 +5,7 @@ import re
 
 class StripAmazonProxyHandler(SimpleHTTPProxyHandler):
     def request_handler(self, req, body):
-        m = re.match(r'http://www\.amazon\.co\.jp/.+?/([A-Z0-9]{10})(?:[^A-Z0-9]|$)', req.path)
+        m = re.match(r'http://www\.amazon\.co\.jp/.+?/dp/([A-Z0-9]{10})', req.path)
         if m:
             redirect_url = "http://www.amazon.co.jp/dp/%s" % m.group(1)
             if req.path == redirect_url:
