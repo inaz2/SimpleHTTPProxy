@@ -56,10 +56,15 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         else:
             conn = httplib.HTTPConnection(u.netloc)
         selector = "%s?%s" % (u.path, u.query)
-        if body:
-            conn.request(req.command, selector, body, headers=dict(req.headers))
-        else:
-            conn.request(req.command, selector, headers=dict(req.headers))
+        try:
+            if body:
+                conn.request(req.command, selector, body, headers=dict(req.headers))
+            else:
+                conn.request(req.command, selector, headers=dict(req.headers))
+        except socket.error:
+            self.send_gateway_timeout()
+            conn.close()
+            return
         res = conn.getresponse(buffering=True)
         res.headers = res.msg    # so that res have the same attribute as req
 
@@ -102,6 +107,17 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
 
             with Lock():
                 self.save_handler(req, res, body)
+
+    def send_gateway_timeout(self):
+        headers = {}
+        self.modify_via_header(headers)
+        headers['Connection'] = 'close'
+
+        self.send_response(504)
+        for k in headers:
+            self.send_header(k, headers[k])
+        self.end_headers()
+        self.wfile.write('504 Gateway Timeout')
 
     def remove_hop_by_hop_headers(self, headers):
         hop_by_hop_headers = ['Connection', 'Keep-Alive', 'Proxy-Authenticate', 'Proxy-Authorization', 'TE', 'Trailers', 'Trailer', 'Transfer-Encoding', 'Upgrade']
