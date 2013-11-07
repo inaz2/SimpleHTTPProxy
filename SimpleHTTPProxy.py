@@ -43,6 +43,8 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
             return
         elif replaced_body is not None:
             body = replaced_body
+            if 'Content-Length' in req.headers:
+                req.headers['Content-Length'] = str(len(body))
         u = urlsplit(req.path)
 
         # RFC 2616 requirements
@@ -90,6 +92,8 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
                 data = io.getvalue()
             else:
                 data = replaced_body
+            if 'Content-Length' in res.headers:
+                res.headers['Content-Length'] = str(len(data))
             body = replaced_body
 
         # RFC 2616 requirements
