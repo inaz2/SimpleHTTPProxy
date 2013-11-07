@@ -38,17 +38,19 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         else:
             body = None
 
-        # RFC 2616 requirements
-        self.modify_via_header(req.headers)
-        req.headers['Connection'] = 'close'
-
         replaced_body = self.request_handler(req, body)
         if replaced_body is True:
             return
         elif replaced_body is not None:
             body = replaced_body
-
         u = urlsplit(req.path)
+
+        # RFC 2616 requirements
+        self.remove_hop_by_hop_headers(req.headers)
+        self.modify_via_header(req.headers)
+        req.headers['Host'] = u.netloc
+        req.headers['Connection'] = 'close'
+
         if u.scheme == 'https':
             conn = httplib.HTTPSConnection(u.netloc)
         else:
@@ -58,8 +60,8 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
             conn.request(req.command, selector, body, headers=dict(req.headers))
         else:
             conn.request(req.command, selector, headers=dict(req.headers))
-        res = conn.getresponse()
-        res.headers = res.msg    # add an alias so that res has the same interface as req
+        res = conn.getresponse(buffering=True)
+        res.headers = res.msg    # so that res have the same attribute as req
 
         is_gziped = res.headers.get('Content-Encoding') == 'gzip'
         data = res.read()
@@ -71,10 +73,6 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
             body = data
 
         conn.close()
-
-        # RFC 2616 requirements
-        self.modify_via_header(res.headers)
-        res.headers['Connection'] = 'close'
 
         replaced_body = self.response_handler(req, res, body)
         if replaced_body is True:
@@ -89,6 +87,11 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
                 data = replaced_body
             body = replaced_body
 
+        # RFC 2616 requirements
+        self.remove_hop_by_hop_headers(res.headers)
+        self.modify_via_header(res.headers)
+        res.headers['Connection'] = 'close'
+
         self.send_response(res.status, res.reason)
         for k in res.headers:
             self.send_header(k, res.headers[k])
@@ -100,14 +103,26 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
             with Lock():
                 self.save_handler(req, res, body)
 
+    def remove_hop_by_hop_headers(self, headers):
+        hop_by_hop_headers = ['Connection', 'Keep-Alive', 'Proxy-Authenticate', 'Proxy-Authorization', 'TE', 'Trailers', 'Trailer', 'Transfer-Encoding', 'Upgrade']
+        connection = headers.get('Connection')
+        if connection:
+            keys = [k.lstrip() for k in connection.split(',')]
+            hop_by_hop_headers.extend(keys)
+
+        for k in hop_by_hop_headers:
+            if k in headers:
+                del headers[k]
+
     def modify_via_header(self, headers):
         if self.protocol_version.startswith('HTTP/'):
             via_string = "%s proxy" % self.protocol_version[len('HTTP/'):]
         else:
             via_string = "%s proxy" % self.protocol_version
 
-        original = headers.get('Via')
-        if original:
+        original = headers.get('Via', '')
+        last_via = original.split(',')[-1].lstrip()
+        if original and last_via != via_string:
             headers['Via'] = original + ', ' + via_string
         else:
             headers['Via'] = via_string
@@ -130,7 +145,7 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         pass
 
 
-def test(HandlerClass=SimpleHTTPProxyHandler, ServerClass=ThreadingHTTPServer, protocol="HTTP/1.0"):
+def test(HandlerClass=SimpleHTTPProxyHandler, ServerClass=ThreadingHTTPServer, protocol="HTTP/1.1"):
     if sys.argv[1:]:
         port = int(sys.argv[1])
     else:

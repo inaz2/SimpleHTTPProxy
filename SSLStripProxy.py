@@ -19,8 +19,6 @@ class SSLStripProxyHandler(SimpleHTTPProxyHandler):
 
             req.command = 'GET'
             req.path = location
-            u = urlsplit(location)
-            req.headers['Host'] = u.netloc
             self.do_SPAM()
             return True
         else:
