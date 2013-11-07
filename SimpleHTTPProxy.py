@@ -9,6 +9,7 @@ from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 from cStringIO import StringIO
 import gzip
 import socket
+import re
 
 class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     # listening on IPv4 address
@@ -103,6 +104,12 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
 
         self.send_response(res.status, res.reason)
         for k in res.headers:
+            # Origin servers SHOULD NOT fold multiple Set-Cookie header fields into a single header field. [RFC 6265]
+            if k == 'set-cookie':
+                re_cookies = r'([^=]+=[^,;]+(?:;\s*Expires=[^,]+,[^,;]+|;[^,;]+)*)(?:,\s*)?'
+                for m in re.finditer(re_cookies, res.headers[k], flags=re.IGNORECASE):
+                    self.send_header(k, m.group(1))
+                continue
             self.send_header(k, res.headers[k])
         self.end_headers()
 
@@ -135,14 +142,10 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
                 del headers[k]
 
     def modify_via_header(self, headers):
-        if self.protocol_version.startswith('HTTP/'):
-            via_string = "%s proxy" % self.protocol_version[len('HTTP/'):]
-        else:
-            via_string = "%s proxy" % self.protocol_version
+        via_string = "%s proxy" % re.sub(r'^HTTP/', '', self.protocol_version)
 
-        original = headers.get('Via', '')
-        last_via = original.split(',')[-1].lstrip()
-        if original and last_via != via_string:
+        original = headers.get('Via')
+        if original:
             headers['Via'] = original + ', ' + via_string
         else:
             headers['Via'] = via_string
