@@ -8,6 +8,8 @@ Features:
 - easy to customize
 - runs fast with minimum footprint
 - requires no external modules
+- HTTP/1.1 compliant to some extent
+- supports IPv6 (for listening you need to edit the script)
 - supports threading
 - supports gzip compression
 - supports sslstrip feature (by SSLStripProxy)
@@ -51,9 +53,13 @@ $ python -m SaveImagesProxy
 
 SSLStripProxy inherits SimpleHTTPProxy and implements [sslstrip](http://www.thoughtcrime.org/software/sslstrip/)-like feature.
 
+- work as HTTP proxy (not HTTPS)
 - replace https urls to http ones in the responses and remember them
 - forward client's HTTP requests to upstream servers as HTTPS requests
 
 Also an example is included:
 
 - OffmousedownGoogleProxy: disable onmousedown URL rewriting in Google's Result Pages (HTTPS)
+- SSLSniffPasswordProxy: output POST parameters for login pages to stdout (also works via HTTP)
+
+"HTTP Strict Transport Security" policies [RFC 6797] make the browsers always use HTTPS for its domain, so this proxy doesn't work for such cases.

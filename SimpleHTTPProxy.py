@@ -134,7 +134,7 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         hop_by_hop_headers = ['Connection', 'Keep-Alive', 'Proxy-Authenticate', 'Proxy-Authorization', 'TE', 'Trailers', 'Trailer', 'Transfer-Encoding', 'Upgrade']
         connection = headers.get('Connection')
         if connection:
-            keys = [k.lstrip() for k in connection.split(',')]
+            keys = re.split(r',\s*', connection)
             hop_by_hop_headers.extend(keys)
 
         for k in hop_by_hop_headers:
