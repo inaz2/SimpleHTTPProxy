@@ -11,7 +11,7 @@ Features:
 - HTTP/1.1 compliant to some extent
 - supports IPv6 (for listening you need to edit the script)
 - supports threading
-- supports gzip compression
+- supports gzip and deflate compression
 - supports sslstrip feature (by SSLStripProxy)
 
 

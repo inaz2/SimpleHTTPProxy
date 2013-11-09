@@ -8,6 +8,7 @@ from SocketServer import ThreadingMixIn
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 from cStringIO import StringIO
 import gzip
+import zlib
 import socket
 import re
 
@@ -71,12 +72,14 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         res = conn.getresponse(buffering=True)
         res.headers = res.msg    # so that res have the same attribute as req
 
-        is_gziped = res.headers.get('Content-Encoding') == 'gzip'
+        content_encoding = res.headers.get('Content-Encoding', 'identity')
         data = res.read()
-        if is_gziped:
+        if content_encoding in ('gzip', 'x-gzip'):
             io = StringIO(data)
             with gzip.GzipFile(fileobj=io) as f:
                 body = f.read()
+        elif content_encoding == 'deflate':
+            body = zlib.decompress(data)
         else:
             body = data
 
@@ -86,11 +89,13 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         if replaced_body is True:
             return
         elif replaced_body is not None:
-            if is_gziped:
+            if content_encoding in ('gzip', 'x-gzip'):
                 io = StringIO()
                 with gzip.GzipFile(fileobj=io, mode='wb') as f:
                     f.write(replaced_body)
                 data = io.getvalue()
+            elif content_encoding == 'deflate':
+                data = zlib.compress(replaced_body)
             else:
                 data = replaced_body
             if 'Content-Length' in res.headers:
