@@ -1,6 +1,7 @@
 # SimpleHTTPProxy
 
 A Simple HTTP Proxy like Python's SimpleHTTPServer module.
+Works on Python 2.7.
 
 Features:
 
@@ -57,9 +58,9 @@ SSLStripProxy inherits SimpleHTTPProxy and implements [sslstrip](http://www.thou
 - replace https urls to http ones in the responses and remember them
 - forward client's HTTP requests to upstream servers as HTTPS requests
 
-Also an example is included:
+Also some examples are included:
 
 - OffmousedownGoogleProxy: disable onmousedown URL rewriting in Google's Result Pages (HTTPS)
 - SSLSniffPasswordProxy: output POST parameters for login pages to stdout (also works via HTTP)
 
-"HTTP Strict Transport Security" policies [RFC 6797] make the browsers always use HTTPS for its domain, so this proxy doesn't work for such cases.
+"HTTP Strict Transport Security" policies [RFC 6797] make the browsers always use HTTPS for their domains, so this proxy doesn't work for such cases.
