@@ -25,8 +25,8 @@ class ThreadingHTTPServer6(ThreadingHTTPServer):
 class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
     global_lock = Lock()
     conn_table = {}
-    timeout = 2
-    upstream_timeout = 115
+    timeout = 2               # timeout with clients, set to None not to make persistent connection
+    upstream_timeout = 115    # timeout with upstream servers, set to None not to make persistent connection
 
     def do_HEAD(self):
         self.do_SPAM()
@@ -59,7 +59,10 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         self.remove_hop_by_hop_headers(req.headers)
         self.modify_via_header(req.headers)
         req.headers['Host'] = u.netloc
-        req.headers['Connection'] = 'Keep-Alive'
+        if self.upstream_timeout:
+            req.headers['Connection'] = 'Keep-Alive'
+        else:
+            req.headers['Connection'] = 'close'
 
         while True:
             with self.lock_origin(origin):
@@ -77,7 +80,7 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
                     self.close_origin(origin)
                     return
                 res.headers = res.msg    # so that res have the same attribute as req
-                if 'close' in res.headers.get('Connection', ''):
+                if not self.upstream_timeout or 'close' in res.headers.get('Connection', ''):
                     self.close_origin(origin)
             break
 
@@ -111,7 +114,10 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         # RFC 2616 requirements
         self.remove_hop_by_hop_headers(res.headers)
         self.modify_via_header(res.headers)
-        res.headers['Connection'] = 'Keep-Alive'
+        if self.timeout:
+            res.headers['Connection'] = 'Keep-Alive'
+        else:
+            res.headers['Connection'] = 'close'
 
         self.send_response(res.status, res.reason)
         for k in res.headers:
@@ -143,17 +149,19 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
                 conn = httplib.HTTPSConnection(netloc)
             else:
                 conn = httplib.HTTPConnection(netloc)
-            timer = Timer(self.upstream_timeout, self.close_origin, args=[origin])
-            timer.daemon = True
-            timer.start()
             self.conn_table[origin]['conn'] = conn
-            self.conn_table[origin]['timer'] = timer
+
+            if self.upstream_timeout:
+                timer = Timer(self.upstream_timeout, self.close_origin, args=[origin])
+                timer.daemon = True
+                timer.start()
+                self.conn_table[origin]['timer'] = timer
         return conn
 
     def close_origin(self, origin):
         with self.lock_origin(origin):
             conn = self.conn_table[origin]['conn']
-            timer = self.conn_table[origin]['timer']
+            timer = self.conn_table[origin].get('timer')
             if timer:
                 timer.cancel()
             conn.close()
