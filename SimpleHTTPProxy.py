@@ -23,6 +23,8 @@ class ThreadingHTTPServer6(ThreadingHTTPServer):
 
 
 class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
+    global_lock = Lock()
+
     def do_HEAD(self):
         self.do_SPAM()
 
@@ -61,19 +63,16 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
             conn = httplib.HTTPConnection(u.netloc)
         selector = "%s?%s" % (u.path, u.query)
         try:
-            if body:
-                conn.request(req.command, selector, body, headers=dict(req.headers))
-            else:
-                conn.request(req.command, selector, headers=dict(req.headers))
+            conn.request(req.command, selector, body, headers=dict(req.headers))
+            res = conn.getresponse(buffering=True)
+            data = res.read()
         except socket.error:
             self.send_gateway_timeout()
             conn.close()
             return
-        res = conn.getresponse(buffering=True)
         res.headers = res.msg    # so that res have the same attribute as req
 
         content_encoding = res.headers.get('Content-Encoding', 'identity')
-        data = res.read()
         if content_encoding in ('gzip', 'x-gzip'):
             io = StringIO(data)
             with gzip.GzipFile(fileobj=io) as f:
@@ -121,7 +120,7 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         if self.command != 'HEAD':
             self.wfile.write(data)
 
-            with Lock():
+            with self.global_lock:
                 self.save_handler(req, res, body)
 
     def send_gateway_timeout(self):
