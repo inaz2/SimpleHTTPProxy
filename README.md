@@ -8,10 +8,10 @@ Features:
 - easy to customize
 - runs fast with minimum footprint
 - requires no external modules
-- HTTP/1.1 compliant to some extent
-- supports IPv6 (for listening you need to edit the script)
+- supports HTTP/1.1 persistent connections to some extent
 - supports threading
 - supports gzip and deflate compression
+- supports IPv6 (for listening you need to edit the script)
 - supports sslstrip feature (by SSLStripProxy)
 
 
