@@ -25,6 +25,7 @@ class ThreadingHTTPServer6(ThreadingHTTPServer):
 class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
     global_lock = Lock()
     conn_table = {}
+    timeout = 2
     upstream_timeout = 115
 
     def do_HEAD(self):
@@ -110,7 +111,7 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         # RFC 2616 requirements
         self.remove_hop_by_hop_headers(res.headers)
         self.modify_via_header(res.headers)
-        res.headers['Connection'] = 'close'
+        res.headers['Connection'] = 'Keep-Alive'
 
         self.send_response(res.status, res.reason)
         for k in res.headers:
