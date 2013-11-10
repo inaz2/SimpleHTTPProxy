@@ -70,7 +70,8 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
                 selector = "%s?%s" % (u.path, u.query)
                 try:
                     conn.request(req.command, selector, body, headers=dict(req.headers))
-                    if not conn.sock.recv(32, socket.MSG_PEEK):
+                    # for SSLSocket.recv(), passing a non-zero flags argument is not allowed
+                    if not isinstance(conn, httplib.HTTPSConnection) and not conn.sock.recv(32, socket.MSG_PEEK):
                         self.close_origin(origin)
                         continue
                     res = conn.getresponse(buffering=True)
