@@ -3,7 +3,7 @@
 import sys
 import httplib
 from urlparse import urlsplit
-from threading import Lock
+from threading import Lock, RLock, Timer
 from SocketServer import ThreadingMixIn
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 from cStringIO import StringIO
@@ -24,6 +24,9 @@ class ThreadingHTTPServer6(ThreadingHTTPServer):
 
 class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
     global_lock = Lock()
+    conn_table = {}
+    timeout = 2               # timeout with clients, set to None not to make persistent connection
+    upstream_timeout = 115    # timeout with upstream servers, set to None not to make persistent connection
 
     def do_HEAD(self):
         self.do_SPAM()
@@ -50,27 +53,37 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
             if 'Content-Length' in req.headers:
                 req.headers['Content-Length'] = str(len(body))
         u = urlsplit(req.path)
+        origin = (u.scheme, u.netloc)
 
         # RFC 2616 requirements
         self.remove_hop_by_hop_headers(req.headers)
         self.modify_via_header(req.headers)
         req.headers['Host'] = u.netloc
-        req.headers['Connection'] = 'close'
-
-        if u.scheme == 'https':
-            conn = httplib.HTTPSConnection(u.netloc)
+        if self.upstream_timeout:
+            req.headers['Connection'] = 'Keep-Alive'
         else:
-            conn = httplib.HTTPConnection(u.netloc)
-        selector = "%s?%s" % (u.path, u.query)
-        try:
-            conn.request(req.command, selector, body, headers=dict(req.headers))
-            res = conn.getresponse(buffering=True)
-            data = res.read()
-        except socket.error:
-            self.send_gateway_timeout()
-            conn.close()
-            return
-        res.headers = res.msg    # so that res have the same attribute as req
+            req.headers['Connection'] = 'close'
+
+        while True:
+            with self.lock_origin(origin):
+                conn = self.open_origin(origin)
+                selector = "%s?%s" % (u.path, u.query)
+                try:
+                    conn.request(req.command, selector, body, headers=dict(req.headers))
+                    # for SSLSocket.recv(), passing a non-zero flags argument is not allowed
+                    if not isinstance(conn, httplib.HTTPSConnection) and not conn.sock.recv(32, socket.MSG_PEEK):
+                        self.close_origin(origin)
+                        continue
+                    res = conn.getresponse(buffering=True)
+                    data = res.read()
+                except socket.error:
+                    self.send_gateway_timeout()
+                    self.close_origin(origin)
+                    return
+                res.headers = res.msg    # so that res have the same attribute as req
+                if not self.upstream_timeout or 'close' in res.headers.get('Connection', ''):
+                    self.close_origin(origin)
+            break
 
         content_encoding = res.headers.get('Content-Encoding', 'identity')
         if content_encoding in ('gzip', 'x-gzip'):
@@ -81,8 +94,6 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
             body = zlib.decompress(data)
         else:
             body = data
-
-        conn.close()
 
         replaced_body = self.response_handler(req, res, body)
         if replaced_body is True:
@@ -104,7 +115,10 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         # RFC 2616 requirements
         self.remove_hop_by_hop_headers(res.headers)
         self.modify_via_header(res.headers)
-        res.headers['Connection'] = 'close'
+        if self.timeout:
+            res.headers['Connection'] = 'Keep-Alive'
+        else:
+            res.headers['Connection'] = 'close'
 
         self.send_response(res.status, res.reason)
         for k in res.headers:
@@ -122,6 +136,37 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
 
             with self.global_lock:
                 self.save_handler(req, res, body)
+
+    def lock_origin(self, origin):
+        d = self.conn_table.setdefault(origin, {})
+        rlock = d.setdefault('rlock', RLock())
+        return rlock
+
+    def open_origin(self, origin):
+        conn = self.conn_table[origin].get('conn')
+        if not conn:
+            scheme, netloc = origin
+            if scheme == 'https':
+                conn = httplib.HTTPSConnection(netloc)
+            else:
+                conn = httplib.HTTPConnection(netloc)
+            self.conn_table[origin]['conn'] = conn
+
+            if self.upstream_timeout:
+                timer = Timer(self.upstream_timeout, self.close_origin, args=[origin])
+                timer.daemon = True
+                timer.start()
+                self.conn_table[origin]['timer'] = timer
+        return conn
+
+    def close_origin(self, origin):
+        with self.lock_origin(origin):
+            conn = self.conn_table[origin]['conn']
+            timer = self.conn_table[origin].get('timer')
+            if timer:
+                timer.cancel()
+            conn.close()
+            del self.conn_table[origin]['conn']
 
     def send_gateway_timeout(self):
         headers = {}
