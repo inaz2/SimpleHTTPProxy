@@ -52,6 +52,7 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
     conn_table = {}
     timeout = 2               # timeout with clients, set to None not to make persistent connection
     upstream_timeout = 115    # timeout with upstream servers, set to None not to make persistent connection
+    proxy_via = None          # pseudonym of the proxy in Via header, set to None not to modify original Via header
 
     def do_HEAD(self):
         self.do_SPAM()
@@ -82,12 +83,13 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
 
         # RFC 2616 requirements
         self.remove_hop_by_hop_headers(req.headers)
-        self.modify_via_header(req.headers)
         req.headers['Host'] = u.netloc
         if self.upstream_timeout:
             req.headers['Connection'] = 'Keep-Alive'
         else:
             req.headers['Connection'] = 'close'
+        if self.proxy_via:
+            self.modify_via_header(req.headers)
 
         while True:
             with self.lock_origin(origin):
@@ -141,11 +143,12 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
 
         # RFC 2616 requirements
         self.remove_hop_by_hop_headers(res.headers)
-        self.modify_via_header(res.headers)
         if self.timeout:
             res.headers['Connection'] = 'Keep-Alive'
         else:
             res.headers['Connection'] = 'close'
+        if self.proxy_via:
+            self.modify_via_header(res.headers)
 
         self.send_response(res.status, res.reason)
         for k in res.headers:
@@ -217,7 +220,8 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
                 del headers[k]
 
     def modify_via_header(self, headers):
-        via_string = "%s proxy" % re.sub(r'^HTTP/', '', self.protocol_version)
+        via_string = "%s %s" % (self.protocol_version, self.proxy_via)
+        via_string = re.sub(r'^HTTP/', '', via_string)
 
         original = headers.get('Via')
         if original:
