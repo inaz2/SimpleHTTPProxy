@@ -12,7 +12,7 @@ import zlib
 import socket
 import re
 
-class ResettableTimer(Thread):
+class RestartableTimer(Thread):
     def __init__(self, interval, function, args=[], kwargs={}):
         Thread.__init__(self)
         self.interval = interval
@@ -20,21 +20,21 @@ class ResettableTimer(Thread):
         self.args = args
         self.kwargs = kwargs
         self.finished = Event()
-        self.resetted = True
+        self.restarted = True
 
     def cancel(self):
         self.finished.set()
 
     def run(self):
-        while self.resetted:
-            self.resetted = False
+        while self.restarted:
+            self.restarted = False
             self.finished.wait(self.interval)
         if not self.finished.is_set():
             self.function(*self.args, **self.kwargs)
         self.finished.set()
 
-    def reset(self):
-        self.resetted = True
+    def restart(self):
+        self.restarted = True
         self.finished.set()
 
 
@@ -111,7 +111,7 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
                 if not timer or 'close' in res.headers.get('Connection', ''):
                     self.close_origin(origin)
                 else:
-                    timer.reset()
+                    timer.restart()
             break
 
         content_encoding = res.headers.get('Content-Encoding', 'identity')
@@ -181,7 +181,7 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
             else:
                 conn = httplib.HTTPConnection(netloc)
             if self.upstream_timeout:
-                timer = ResettableTimer(self.upstream_timeout, self.close_origin, args=[origin])
+                timer = RestartableTimer(self.upstream_timeout, self.close_origin, args=[origin])
                 timer.daemon = True
                 timer.start()
             else:
