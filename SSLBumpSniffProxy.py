@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 
-from SSLBurpProxy import SSLBurpProxyHandler, test
+from SSLBumpProxy import SSLBumpProxyHandler, test
 import urlparse
 
-class SSLBurpSniffProxyHandler(SSLBurpProxyHandler):
+class SSLBumpSniffProxyHandler(SSLBumpProxyHandler):
     def request_handler(self, req, body):
-        SSLBurpProxyHandler.request_handler(self, req, body)
+        SSLBumpProxyHandler.request_handler(self, req, body)
 
         if req.command == 'POST' and req.headers.get('Content-Type').startswith('application/x-www-form-urlencoded'):
             print req.path
@@ -14,4 +14,4 @@ class SSLBurpSniffProxyHandler(SSLBurpProxyHandler):
 
 
 if __name__ == '__main__':
-    test(HandlerClass=SSLBurpSniffProxyHandler)
+    test(HandlerClass=SSLBumpSniffProxyHandler)

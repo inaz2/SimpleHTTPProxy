@@ -3,9 +3,9 @@
 from SimpleHTTPProxy import SimpleHTTPProxyHandler, test
 import ssl
 
-class SSLBurpProxyHandler(SimpleHTTPProxyHandler):
-    keyfile = 'SSLBurpProxy/server.key'
-    certfile = 'SSLBurpProxy/server.crt'
+class SSLBumpProxyHandler(SimpleHTTPProxyHandler):
+    keyfile = 'SSLBumpProxy/server.key'
+    certfile = 'SSLBumpProxy/server.crt'
     timeout = None    # FIXME: SSL connection to the client needs to be closed every time
 
     def do_CONNECT(self):
@@ -25,4 +25,4 @@ class SSLBurpProxyHandler(SimpleHTTPProxyHandler):
 
 
 if __name__ == '__main__':
-    test(HandlerClass=SSLBurpProxyHandler)
+    test(HandlerClass=SSLBumpProxyHandler)
