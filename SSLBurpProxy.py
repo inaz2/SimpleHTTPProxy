@@ -6,6 +6,7 @@ import ssl
 class SSLBurpProxyHandler(SimpleHTTPProxyHandler):
     keyfile = 'SSLBurpProxy/server.key'
     certfile = 'SSLBurpProxy/server.crt'
+    timeout = None    # FIXME: SSL connection to the client needs to be closed every time
 
     def do_CONNECT(self):
         self.send_response(200, 'Connection Established')
