@@ -10,6 +10,7 @@ from cStringIO import StringIO
 import gzip
 import zlib
 import socket
+import select
 import re
 
 class RestartableTimer(Thread):
@@ -53,6 +54,34 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
     timeout = 2               # timeout with clients, set to None not to make persistent connection
     upstream_timeout = 115    # timeout with upstream servers, set to None not to make persistent connection
     proxy_via = None          # pseudonym of the proxy in Via header, set to None not to modify original Via header
+
+    def do_CONNECT(self):
+        # just provide a tunnel, transfer the data with no modification
+        # override here if you need
+
+        if ':' in self.path:
+            address = self.path.split(':', 1)
+        else:
+            address = (self.path, 443)
+
+        s = socket.create_connection(address)
+        self.send_response(200, 'Connection Established')
+        self.end_headers()
+
+        import select
+        while True:
+            rlist, wlist, xlist = select.select([self.connection, s], [], [self.connection, s], self.timeout)
+            if xlist:
+                break
+            will_close = True
+            for r in rlist:
+                other = self.connection if r is s else s
+                data = r.recv(8192)
+                if data:
+                    other.sendall(data)
+                    will_close = False
+            if will_close:
+                break
 
     def do_HEAD(self):
         self.do_SPAM()
