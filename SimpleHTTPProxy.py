@@ -7,6 +7,7 @@ from threading import Lock, RLock, Thread, Event
 from SocketServer import ThreadingMixIn
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 from cStringIO import StringIO
+import traceback
 import gzip
 import zlib
 import socket
@@ -42,6 +43,10 @@ class RestartableTimer(Thread):
 class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     # listening on IPv4 address
     address_family = socket.AF_INET
+
+    def handle_error(self, request, client_address):
+        # override BaseServer
+        traceback.print_exc() # XXX But this goes to stderr!
 
 
 class ThreadingHTTPServer6(ThreadingHTTPServer):
