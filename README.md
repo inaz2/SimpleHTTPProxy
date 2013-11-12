@@ -10,10 +10,11 @@ Features:
 - runs fast with minimum footprint
 - requires no external modules
 - supports HTTP/1.1 persistent connections to some extent
-- supports threading
+- supports CONNECT tunneling
 - supports gzip and deflate compression
 - supports IPv6 (for listening you need to edit the script)
 - supports sslstrip feature (by SSLStripProxy)
+- supports sslbump feature (by SSLBumpProxy, without dynamic certificate generation)
 
 
 ## Usage
@@ -30,6 +31,8 @@ $ python -m SimpleHTTPProxy
 
 When the argument is not given, SimpleHTTPProxy uses tcp/8080.
 
+SimpleHTTPProxy provides CONNECT tunneling, in which the data is transfered with no modification.
+
 
 ## Customize
 
@@ -42,6 +45,7 @@ Some examples are included:
 - HideRefererProxy: replace 'Referer' header of the client requests
 - RemoveIframeProxy: remove all &lt;iframe&gt; elements from 'text/html' contents
 - StripAmazonProxy: force redirect to 'http://www.amazon.co.jp/dp/$ASIN' style url
+- ShowHeadersProxy: print HTTP headers of requests and responses
 
 You can use these proxies just as SimpleHTTPProxy:
 
@@ -60,7 +64,23 @@ SSLStripProxy inherits SimpleHTTPProxy and implements [sslstrip](http://www.thou
 
 Also some examples are included:
 
+- SSLStripSniffProxy: output POST parameters for login pages to stdout (also works via HTTP)
 - OffmousedownGoogleProxy: disable onmousedown URL rewriting in Google's Result Pages (HTTPS)
-- SSLSniffPasswordProxy: output POST parameters for login pages to stdout (also works via HTTP)
 
 "HTTP Strict Transport Security" policies [RFC 6797] make the browsers always use HTTPS for their domains, so this proxy doesn't work for such cases.
+
+
+## sslbumpping by SSLBumpProxy
+
+SSLBumpProxy inherits SimpleHTTPProxy and implements [Squid's SslBump](http://wiki.squid-cache.org/Features/SslBump)-like feature.
+
+- work as HTTPS proxy (also as HTTP proxy)
+- connect with the client using SSLBumpProxy's certificate
+- note that the client will raise a warning about the certificate
+
+An example is included:
+
+- SSLBurpSniffProxy: output POST parameters for login pages to stdout (also works via HTTP)
+
+Currently, SSLBumpProxy doesn't do dynamic certificate generation.
+Just use a prepared certificate.
