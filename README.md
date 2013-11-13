@@ -45,7 +45,7 @@ Some examples are included:
 - HideRefererProxy: replace 'Referer' header of the client requests
 - RemoveIframeProxy: remove all &lt;iframe&gt; elements from 'text/html' contents
 - StripAmazonProxy: force redirect to 'http://www.amazon.co.jp/dp/$ASIN' style url
-- ShowHeadersProxy: print HTTP headers of requests and responses
+- CatHeadersProxy: print HTTP headers to stdout
 
 You can use these proxies just as SimpleHTTPProxy:
 

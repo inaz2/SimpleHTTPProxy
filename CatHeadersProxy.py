@@ -3,7 +3,7 @@
 from SimpleHTTPProxy import SimpleHTTPProxyHandler, test
 import sys
 
-class ShowHeadersProxyHandler(SimpleHTTPProxyHandler):
+class CatHeadersProxyHandler(SimpleHTTPProxyHandler):
     version_table = {10: 'HTTP/1.0', 11: 'HTTP/1.1', 9: 'HTTP/0.9'}
 
     def save_handler(self, req, res, body):
@@ -18,4 +18,4 @@ class ShowHeadersProxyHandler(SimpleHTTPProxyHandler):
 
 
 if __name__ == '__main__':
-    test(HandlerClass=ShowHeadersProxyHandler)
+    test(HandlerClass=CatHeadersProxyHandler)
