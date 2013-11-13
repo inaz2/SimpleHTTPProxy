@@ -128,7 +128,7 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         while True:
             with self.lock_origin(origin):
                 conn, timer = self.open_origin(origin)
-                selector = "%s?%s" % (u.path, u.query)
+                selector = "%s?%s" % (u.path, u.query) if u.query else u.path
                 try:
                     conn.request(req.command, selector, body, headers=dict(req.headers))
                     # for SSLSocket.recv(), passing a non-zero flags argument is not allowed
