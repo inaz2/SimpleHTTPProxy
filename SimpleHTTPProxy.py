@@ -131,16 +131,22 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
                 selector = "%s?%s" % (u.path, u.query) if u.query else u.path
                 try:
                     conn.request(req.command, selector, body, headers=dict(req.headers))
-                    # for SSLSocket.recv(), passing a non-zero flags argument is not allowed
-                    if not isinstance(conn, httplib.HTTPSConnection) and not conn.sock.recv(32, socket.MSG_PEEK):
-                        self.close_origin(origin)
-                        continue
-                    res = conn.getresponse(buffering=True)
-                    data = res.read()
                 except socket.error:
+                    # Couldn't connect to the server.
                     self.send_gateway_timeout()
                     self.close_origin(origin)
                     return
+                try:
+                    res = conn.getresponse(buffering=True)
+                except httplib.BadStatusLine as e:
+                    if e.line == "''":
+                        # Presumably, the connection had been closed by the server.
+                        # Go for a retry with a new connection.
+                        self.close_origin(origin)
+                        continue
+                    else:
+                        raise
+                data = res.read()
                 res.headers = res.msg    # so that res have the same attribute as req
                 if not timer or 'close' in res.headers.get('Connection', ''):
                     self.close_origin(origin)
