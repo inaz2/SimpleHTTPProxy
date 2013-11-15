@@ -12,6 +12,8 @@ class SSLStripProxyHandler(SimpleHTTPProxyHandler):
         if req.path in self.forward_table:
             req.path = self.forward_table[req.path]
 
+        return self.ssl_request_handler(req, body)
+
     def response_handler(self, req, res, body):
         replaced_body = self.ssl_response_handler(req, res, body)
         if replaced_body is True:
@@ -44,6 +46,12 @@ class SSLStripProxyHandler(SimpleHTTPProxyHandler):
             body = re.sub(re_url, replace_method, body)
 
         return body
+
+    def ssl_request_handler(self, req, body):
+        # override here
+        # return True if you sent the response here and the proxy should not connect to the upstream server
+        # return replaced body (other than None and True) if you did
+        pass
 
     def ssl_response_handler(self, req, res, body):
         # override here

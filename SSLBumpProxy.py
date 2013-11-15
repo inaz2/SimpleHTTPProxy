@@ -16,11 +16,11 @@ class SSLBumpProxyHandler(SimpleHTTPProxyHandler):
         self.rfile = self.connection.makefile("rb", self.rbufsize)
         self.wfile = self.connection.makefile("wb", self.wbufsize)
 
-        self.origin = "https://%s" % self.path.replace(':443', '')
+        self.https_origin = "https://%s" % self.path.replace(':443', '')
 
     def do_SPAM(self):
-        if not self.path.startswith('http'):
-            self.path = self.origin + self.path
+        if hasattr(self, 'https_origin'):
+            self.path = self.https_origin + self.path
         SimpleHTTPProxyHandler.do_SPAM(self)
 
 
