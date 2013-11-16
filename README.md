@@ -75,7 +75,7 @@ Also some examples are included:
 SSLBumpProxy inherits SimpleHTTPProxy and implements [Squid's SslBump](http://wiki.squid-cache.org/Features/SslBump)-like feature.
 
 - work as HTTPS proxy (also as HTTP proxy)
-- connect with the client using SSLBumpProxy's certificate
+- connect with the client by using SSLBumpProxy's certificate
 - note that the client will raise a warning about the certificate
 
 An example is included:

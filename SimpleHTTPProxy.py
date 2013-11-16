@@ -73,20 +73,18 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         self.send_response(200, 'Connection Established')
         self.end_headers()
 
-        import select
-        while True:
+        keep_connection = True
+        while keep_connection:
+            keep_connection = False
             rlist, wlist, xlist = select.select([self.connection, s], [], [self.connection, s], self.timeout)
             if xlist:
                 break
-            will_close = True
             for r in rlist:
                 other = self.connection if r is s else s
                 data = r.recv(8192)
                 if data:
                     other.sendall(data)
-                    will_close = False
-            if will_close:
-                break
+                    keep_connection = True
 
     def do_HEAD(self):
         self.do_SPAM()
@@ -112,18 +110,19 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
             body = replaced_body
             if 'Content-Length' in req.headers:
                 req.headers['Content-Length'] = str(len(body))
-        u = urlsplit(req.path)
-        origin = (u.scheme, u.netloc)
 
         # RFC 2616 requirements
         self.remove_hop_by_hop_headers(req.headers)
-        req.headers['Host'] = u.netloc
         if self.upstream_timeout:
             req.headers['Connection'] = 'Keep-Alive'
         else:
             req.headers['Connection'] = 'close'
         if self.proxy_via:
             self.modify_via_header(req.headers)
+
+        u = urlsplit(req.path)
+        origin = (u.scheme, u.netloc)
+        req.headers['Host'] = u.netloc
 
         while True:
             with self.lock_origin(origin):

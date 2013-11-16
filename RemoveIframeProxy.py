@@ -3,7 +3,7 @@
 from SimpleHTTPProxy import SimpleHTTPProxyHandler, test
 import re
 
-class ReplaceContentProxyHandler(SimpleHTTPProxyHandler):
+class RemoveIframeProxyHandler(SimpleHTTPProxyHandler):
     def response_handler(self, req, res, body):
         content_type = res.headers.get('Content-Type', '')
         if content_type.startswith('text/html'):
@@ -11,4 +11,4 @@ class ReplaceContentProxyHandler(SimpleHTTPProxyHandler):
 
 
 if __name__ == '__main__':
-    test(HandlerClass=ReplaceContentProxyHandler)
+    test(HandlerClass=RemoveIframeProxyHandler)
