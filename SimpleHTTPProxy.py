@@ -154,28 +154,13 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
             break
 
         content_encoding = res.headers.get('Content-Encoding', 'identity')
-        if content_encoding in ('gzip', 'x-gzip'):
-            io = StringIO(data)
-            with gzip.GzipFile(fileobj=io) as f:
-                body = f.read()
-        elif content_encoding == 'deflate':
-            body = zlib.decompress(data)
-        else:
-            body = data
+        body = self.decode_content_body(data, content_encoding)
 
         replaced_body = self.response_handler(req, res, body)
         if replaced_body is True:
             return
         elif replaced_body is not None:
-            if content_encoding in ('gzip', 'x-gzip'):
-                io = StringIO()
-                with gzip.GzipFile(fileobj=io, mode='wb') as f:
-                    f.write(replaced_body)
-                data = io.getvalue()
-            elif content_encoding == 'deflate':
-                data = zlib.compress(replaced_body)
-            else:
-                data = replaced_body
+            data = self.encode_content_body(replaced_body, content_encoding)
             if 'Content-Length' in res.headers:
                 res.headers['Content-Length'] = str(len(data))
             body = replaced_body
@@ -191,13 +176,12 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
 
         self.send_response(res.status, res.reason)
         for k in res.headers:
-            # Origin servers SHOULD NOT fold multiple Set-Cookie header fields into a single header field. [RFC 6265]
             if k == 'set-cookie':
-                re_cookies = r'([^=]+=[^,;]+(?:;\s*Expires=[^,]+,[^,;]+|;[^,;]+)*)(?:,\s*)?'
-                for m in re.finditer(re_cookies, res.headers[k], flags=re.IGNORECASE):
-                    self.send_header(k, m.group(1))
-                continue
-            self.send_header(k, res.headers[k])
+                # Origin servers SHOULD NOT fold multiple Set-Cookie header fields into a single header field. [RFC 6265]
+                for v in self.split_set_cookie_header(res.headers[k]):
+                    self.send_header(k, v)
+            else:
+                self.send_header(k, res.headers[k])
         self.end_headers()
 
         if self.command != 'HEAD':
@@ -267,6 +251,37 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
             headers['Via'] = original + ', ' + via_string
         else:
             headers['Via'] = via_string
+
+    def decode_content_body(self, data, content_encoding):
+        if content_encoding in ('gzip', 'x-gzip'):
+            io = StringIO(data)
+            with gzip.GzipFile(fileobj=io) as f:
+                body = f.read()
+        elif content_encoding == 'deflate':
+            body = zlib.decompress(data)
+        elif content_encoding == 'identity':
+            body = data
+        else:
+            raise Exception("Unknown Content-Encoding: %s" % content_encoding)
+        return body
+
+    def encode_content_body(self, body, content_encoding):
+        if content_encoding in ('gzip', 'x-gzip'):
+            io = StringIO()
+            with gzip.GzipFile(fileobj=io, mode='wb') as f:
+                f.write(body)
+            data = io.getvalue()
+        elif content_encoding == 'deflate':
+            data = zlib.compress(body)
+        elif content_encoding == 'identity':
+            data = body
+        else:
+            raise Exception("Unknown Content-Encoding: %s" % content_encoding)
+        return data
+
+    def split_set_cookie_header(self, value):
+        re_cookies = r'([^=]+=[^,;]+(?:;\s*Expires=[^,]+,[^,;]+|;[^,;]+)*)(?:,\s*)?'
+        return re.findall(re_cookies, value, flags=re.IGNORECASE)
 
     def request_handler(self, req, body):
         # override here
