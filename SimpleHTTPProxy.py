@@ -100,17 +100,17 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         req = self
         content_length = int(req.headers.get('Content-Length', 0))
         if content_length > 0:
-            body = self.rfile.read(content_length)
+            reqbody = self.rfile.read(content_length)
         else:
-            body = None
+            reqbody = None
 
-        replaced_body = self.request_handler(req, body)
-        if replaced_body is True:
+        replaced_reqbody = self.request_handler(req, reqbody)
+        if replaced_reqbody is True:
             return
-        elif replaced_body is not None:
-            body = replaced_body
+        elif replaced_reqbody is not None:
+            reqbody = replaced_reqbody
             if 'Content-Length' in req.headers:
-                req.headers['Content-Length'] = str(len(body))
+                req.headers['Content-Length'] = str(len(reqbody))
 
         # RFC 2616 requirements
         self.remove_hop_by_hop_headers(req.headers)
@@ -122,21 +122,21 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
             self.modify_via_header(req.headers)
 
         try:
-            res, data = self.request_to_upstream_server(req, body)
+            res, resdata = self.request_to_upstream_server(req, reqbody)
         except socket.error:
             return
 
         content_encoding = res.headers.get('Content-Encoding', 'identity')
-        body = self.decode_content_body(data, content_encoding)
+        resbody = self.decode_content_body(resdata, content_encoding)
 
-        replaced_body = self.response_handler(req, res, body)
-        if replaced_body is True:
+        replaced_resbody = self.response_handler(req, res, resbody)
+        if replaced_resbody is True:
             return
-        elif replaced_body is not None:
-            data = self.encode_content_body(replaced_body, content_encoding)
+        elif replaced_resbody is not None:
+            resdata = self.encode_content_body(replaced_resbody, content_encoding)
             if 'Content-Length' in res.headers:
-                res.headers['Content-Length'] = str(len(data))
-            body = replaced_body
+                res.headers['Content-Length'] = str(len(resdata))
+            resbody = replaced_resbody
 
         # RFC 2616 requirements
         self.remove_hop_by_hop_headers(res.headers)
@@ -158,11 +158,11 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
         if self.command != 'HEAD':
-            self.wfile.write(data)
+            self.wfile.write(resdata)
             with self.global_lock:
-                self.save_handler(req, res, body)
+                self.save_handler(req, res, resbody)
 
-    def request_to_upstream_server(self, req, body):
+    def request_to_upstream_server(self, req, reqbody):
         u = urlsplit(req.path)
         origin = (u.scheme, u.netloc)
         req.headers['Host'] = u.netloc
@@ -172,7 +172,7 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
                 conn, timer = self.open_origin(origin)
                 selector = "%s?%s" % (u.path, u.query) if u.query else u.path
                 try:
-                    conn.request(req.command, selector, body, headers=dict(req.headers))
+                    conn.request(req.command, selector, reqbody, headers=dict(req.headers))
                 except socket.error:
                     # Couldn't connect to the server.
                     self.send_gateway_timeout()
@@ -188,13 +188,13 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
                         continue
                     else:
                         raise
-                data = res.read()
+                resdata = res.read()
                 res.headers = res.msg    # so that res have the same attribute as req
                 if not timer or 'close' in res.headers.get('Connection', ''):
                     self.close_origin(origin)
                 else:
                     timer.restart()
-            return res, data
+            return res, resdata
 
     def lock_origin(self, origin):
         d = self.conn_table.setdefault(origin, {})
@@ -291,19 +291,19 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         re_cookies = r'([^=]+=[^,;]+(?:;\s*Expires=[^,]+,[^,;]+|;[^,;]+)*)(?:,\s*)?'
         return re.findall(re_cookies, value, flags=re.IGNORECASE)
 
-    def request_handler(self, req, body):
+    def request_handler(self, req, reqbody):
         # override here
         # return True if you sent the response here and the proxy should not connect to the upstream server
-        # return replaced body (other than None and True) if you did
+        # return replaced reqbody (other than None and True) if you did
         pass
 
-    def response_handler(self, req, res, body):
+    def response_handler(self, req, res, resbody):
         # override here
         # return True if you sent the response here and the proxy should not connect to the upstream server
-        # return replaced body (other than None and True) if you did
+        # return replaced resbody (other than None and True) if you did
         pass
 
-    def save_handler(self, req, res, body):
+    def save_handler(self, req, res, resbody):
         # override here
         # this handler is called after the proxy sent a response to the client
         # this handler is thread-safe, because this handler is always called with a global lock
