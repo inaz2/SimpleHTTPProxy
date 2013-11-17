@@ -55,6 +55,7 @@ class ThreadingHTTPServer6(ThreadingHTTPServer):
 
 
 class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
+    global_lock = Lock()
     conn_table = {}
     timeout = 2               # timeout with clients, set to None not to make persistent connection
     upstream_timeout = 115    # timeout with upstream servers, set to None not to make persistent connection
@@ -186,7 +187,8 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
 
         if self.command != 'HEAD':
             self.wfile.write(data)
-            self.save_handler(req, res, body)
+            with self.global_lock:
+                self.save_handler(req, res, body)
 
     def lock_origin(self, origin):
         d = self.conn_table.setdefault(origin, {})
@@ -298,7 +300,7 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
     def save_handler(self, req, res, body):
         # override here
         # this handler is called after the proxy sent a response to the client
-        # you'll need to use threading.Lock() by yourself when writing files
+        # this handler is thread-safe, because this handler is always called with a global lock
         pass
 
 
