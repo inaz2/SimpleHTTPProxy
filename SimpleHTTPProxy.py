@@ -121,38 +121,10 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         if self.proxy_via:
             self.modify_via_header(req.headers)
 
-        u = urlsplit(req.path)
-        origin = (u.scheme, u.netloc)
-        req.headers['Host'] = u.netloc
-
-        while True:
-            with self.lock_origin(origin):
-                conn, timer = self.open_origin(origin)
-                selector = "%s?%s" % (u.path, u.query) if u.query else u.path
-                try:
-                    conn.request(req.command, selector, body, headers=dict(req.headers))
-                except socket.error:
-                    # Couldn't connect to the server.
-                    self.send_gateway_timeout()
-                    self.close_origin(origin)
-                    return
-                try:
-                    res = conn.getresponse(buffering=True)
-                except httplib.BadStatusLine as e:
-                    if e.line == "''":
-                        # Presumably, the connection had been closed by the server.
-                        # Go for a retry with a new connection.
-                        self.close_origin(origin)
-                        continue
-                    else:
-                        raise
-                data = res.read()
-                res.headers = res.msg    # so that res have the same attribute as req
-                if not timer or 'close' in res.headers.get('Connection', ''):
-                    self.close_origin(origin)
-                else:
-                    timer.restart()
-            break
+        try:
+            res, data = self.request_to_upstream_server(req, body)
+        except socket.error:
+            return
 
         content_encoding = res.headers.get('Content-Encoding', 'identity')
         body = self.decode_content_body(data, content_encoding)
@@ -189,6 +161,40 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
             self.wfile.write(data)
             with self.global_lock:
                 self.save_handler(req, res, body)
+
+    def request_to_upstream_server(self, req, body):
+        u = urlsplit(req.path)
+        origin = (u.scheme, u.netloc)
+        req.headers['Host'] = u.netloc
+
+        while True:
+            with self.lock_origin(origin):
+                conn, timer = self.open_origin(origin)
+                selector = "%s?%s" % (u.path, u.query) if u.query else u.path
+                try:
+                    conn.request(req.command, selector, body, headers=dict(req.headers))
+                except socket.error:
+                    # Couldn't connect to the server.
+                    self.send_gateway_timeout()
+                    self.close_origin(origin)
+                    raise
+                try:
+                    res = conn.getresponse(buffering=True)
+                except httplib.BadStatusLine as e:
+                    if e.line == "''":
+                        # Presumably, the connection had been closed by the server.
+                        # Go for a retry with a new connection.
+                        self.close_origin(origin)
+                        continue
+                    else:
+                        raise
+                data = res.read()
+                res.headers = res.msg    # so that res have the same attribute as req
+                if not timer or 'close' in res.headers.get('Connection', ''):
+                    self.close_origin(origin)
+                else:
+                    timer.restart()
+            return res, data
 
     def lock_origin(self, origin):
         d = self.conn_table.setdefault(origin, {})
