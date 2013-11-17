@@ -6,7 +6,7 @@ import os
 class SaveImagesProxyHandler(SimpleHTTPProxyHandler):
     def url2path(self, url):
         schema, _, urlpath = self.path.split('/', 2)
-        fpath = schema + '/' + urlpath.split('?')[0]
+        fpath = "SaveImagesProxy/%s/%s" % (schema.rstrip(':'), urlpath.split('?')[0])
         fdir, fname = os.path.split(fpath)
         if not fname:
             fname = 'index.html'

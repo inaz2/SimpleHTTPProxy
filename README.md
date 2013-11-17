@@ -40,7 +40,7 @@ To customize, inherit `SimpleHTTPProxyHandler` class and override the handler me
 
 Some examples are included:
 
-- SaveImagesProxy: store all 'image/*' files on the current directory (by keeping their url hierarchy)
+- SaveImagesProxy: store all 'image/*' files on 'SaveImagesProxy/' directory (by keeping their url hierarchy)
 - ChangeUAProxy: replace 'User-Agent' header of the client requests
 - HideRefererProxy: replace 'Referer' header of the client requests
 - RemoveIframeProxy: remove all &lt;iframe&gt; elements from 'text/html' contents
