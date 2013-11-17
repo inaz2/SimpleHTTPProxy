@@ -7,19 +7,19 @@ import re
 class SSLStripProxyHandler(SimpleHTTPProxyHandler):
     forward_table = {}
 
-    def request_handler(self, req, body):
+    def request_handler(self, req, reqbody):
         # forward known https urls
         if req.path in self.forward_table:
             req.path = self.forward_table[req.path]
 
-        return self.ssl_request_handler(req, body)
+        return self.ssl_request_handler(req, reqbody)
 
-    def response_handler(self, req, res, body):
-        replaced_body = self.ssl_response_handler(req, res, body)
-        if replaced_body is True:
+    def response_handler(self, req, reqbody, res, resbody):
+        replaced_resbody = self.ssl_response_handler(req, reqbody, res, resbody)
+        if replaced_resbody is True:
             return True
-        elif replaced_body is not None:
-            body = replaced_body
+        elif replaced_resbody is not None:
+            resbody = replaced_resbody
 
         # strip secure cookies
         set_cookie = res.headers.get('Set-Cookie')
@@ -43,20 +43,20 @@ class SSLStripProxyHandler(SimpleHTTPProxyHandler):
                 raw_path = m.group(3).replace('&amp;', '&')
                 self.forward_table['http://' + raw_path] = 'https://' + raw_path
                 return '%shttp://%s%s' % (m.group(1), m.group(3), m.group(4))
-            body = re.sub(re_url, replace_method, body)
+            resbody = re.sub(re_url, replace_method, resbody)
 
-        return body
+        return resbody
 
-    def ssl_request_handler(self, req, body):
+    def ssl_request_handler(self, req, reqbody):
         # override here
         # return True if you sent the response here and the proxy should not connect to the upstream server
-        # return replaced body (other than None and True) if you did
+        # return replaced reqbody (other than None and True) if you did
         pass
 
-    def ssl_response_handler(self, req, res, body):
+    def ssl_response_handler(self, req, reqbody, res, resbody):
         # override here
         # return True if you sent the response here and the proxy should not connect to the upstream server
-        # return replaced body (other than None and True) if you did
+        # return replaced resbody (other than None and True) if you did
         pass
 
 

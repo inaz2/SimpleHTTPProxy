@@ -129,7 +129,7 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         content_encoding = res.headers.get('Content-Encoding', 'identity')
         resbody = self.decode_content_body(resdata, content_encoding)
 
-        replaced_resbody = self.response_handler(req, res, resbody)
+        replaced_resbody = self.response_handler(req, reqbody, res, resbody)
         if replaced_resbody is True:
             return
         elif replaced_resbody is not None:
@@ -160,7 +160,7 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         if self.command != 'HEAD':
             self.wfile.write(resdata)
             with self.global_lock:
-                self.save_handler(req, res, resbody)
+                self.save_handler(req, reqbody, res, resbody)
 
     def request_to_upstream_server(self, req, reqbody):
         u = urlsplit(req.path)
@@ -297,13 +297,13 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         # return replaced reqbody (other than None and True) if you did
         pass
 
-    def response_handler(self, req, res, resbody):
+    def response_handler(self, req, reqbody, res, resbody):
         # override here
         # return True if you sent the response here and the proxy should not connect to the upstream server
         # return replaced resbody (other than None and True) if you did
         pass
 
-    def save_handler(self, req, res, resbody):
+    def save_handler(self, req, reqbody, res, resbody):
         # override here
         # this handler is called after the proxy sent a response to the client
         # this handler is thread-safe, because this handler is always called with a global lock

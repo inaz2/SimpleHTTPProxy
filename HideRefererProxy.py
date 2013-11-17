@@ -3,7 +3,7 @@
 from SimpleHTTPProxy import SimpleHTTPProxyHandler, test
 
 class HideRefererProxyHandler(SimpleHTTPProxyHandler):
-    def request_handler(self, req, body):
+    def request_handler(self, req, reqbody):
         req.headers['Referer'] = req.path
         # del req.headers['Referer']
 

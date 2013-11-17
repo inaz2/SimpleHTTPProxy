@@ -3,9 +3,9 @@
 from SSLStripProxy import SSLStripProxyHandler, test
 
 class OffmousedownGoogleProxyHandler(SSLStripProxyHandler):
-    def ssl_response_handler(self, req, res, body):
+    def ssl_response_handler(self, req, reqbody, res, resbody):
         if req.path.startswith('https://www.google.com/search?'):
-            return body.replace(' onmousedown="', ' onmousedown="return;')
+            return resbody.replace(' onmousedown="', ' onmousedown="return;')
 
 
 if __name__ == '__main__':

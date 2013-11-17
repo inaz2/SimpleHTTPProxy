@@ -13,7 +13,7 @@ class SaveImagesProxyHandler(SimpleHTTPProxyHandler):
             fpath = os.path.join(fdir, fname)
         return fpath
 
-    def save_handler(self, req, res, body):
+    def save_handler(self, req, reqbody, res, resbody):
         content_type = res.headers.get('Content-Type', '')
         if content_type.startswith('image/'):
             fpath = self.url2path(self.path)
@@ -21,7 +21,7 @@ class SaveImagesProxyHandler(SimpleHTTPProxyHandler):
             if not os.path.isdir(fdir):
                 os.makedirs(fdir)
             with open(fpath, 'wb') as f:
-                f.write(body)
+                f.write(resbody)
 
 
 if __name__ == '__main__':
