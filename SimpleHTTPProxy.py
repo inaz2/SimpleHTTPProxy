@@ -70,7 +70,12 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         else:
             address = (self.path, 443)
 
-        s = socket.create_connection(address)
+        try:
+            s = socket.create_connection(address)
+        except socket.error:
+            # Couldn't connect to the server.
+            self.send_gateway_timeout()
+            return
         self.send_response(200, 'Connection Established')
         self.end_headers()
 
