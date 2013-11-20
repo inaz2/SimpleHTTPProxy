@@ -2,17 +2,18 @@
 
 import sys
 import httplib
-from urlparse import urlsplit
-from threading import Lock, RLock, Thread, Event
 from SocketServer import ThreadingMixIn
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
+from threading import Lock, RLock, Thread, Event
 from cStringIO import StringIO
-import traceback
-import gzip
-import zlib
+from urlparse import urlsplit
 import socket
 import select
+import gzip
+import zlib
 import re
+import traceback
+
 
 class RestartableTimer(Thread):
     def __init__(self, interval, function, args=[], kwargs={}):
@@ -45,8 +46,11 @@ class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     address_family = socket.AF_INET
 
     def handle_error(self, request, client_address):
-        # override BaseServer
-        traceback.print_exc() # XXX But this goes to stderr!
+        # override SocketServer.BaseServer
+        print >>sys.stderr, '-'*40
+        print >>sys.stderr, 'Exception happened during processing of request from', client_address
+        traceback.print_exc()
+        print >>sys.stderr, '-'*40
 
 
 class ThreadingHTTPServer6(ThreadingHTTPServer):
@@ -68,25 +72,25 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         if ':' in self.path:
             address = self.path.split(':', 1)
         else:
-            address = (self.path, 443)
+            address = (self.path, 443)    # workaround
 
         try:
-            s = socket.create_connection(address)
+            conn = socket.create_connection(address)
         except socket.error:
-            # Couldn't connect to the server.
-            self.send_gateway_timeout()
+            self.send_error(504)    # 504 Gateway Timeout
             return
         self.send_response(200, 'Connection Established')
         self.end_headers()
 
+        conns = [self.connection, conn]
         keep_connection = True
         while keep_connection:
             keep_connection = False
-            rlist, wlist, xlist = select.select([self.connection, s], [], [self.connection, s], self.timeout)
+            rlist, wlist, xlist = select.select(conns, [], conns, self.timeout)
             if xlist:
                 break
             for r in rlist:
-                other = self.connection if r is s else s
+                other = conns[1] if r is conns[0] else conns[0]
                 data = r.recv(8192)
                 if data:
                     other.sendall(data)
@@ -117,7 +121,7 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
             if 'Content-Length' in req.headers:
                 req.headers['Content-Length'] = str(len(reqbody))
 
-        # RFC 2616 requirements
+        # follow RFC 2616 requirements
         self.remove_hop_by_hop_headers(req.headers)
         if self.upstream_timeout:
             req.headers['Connection'] = 'Keep-Alive'
@@ -129,6 +133,7 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         try:
             res, resdata = self.request_to_upstream_server(req, reqbody)
         except socket.error:
+            self.send_error(504)    # 504 Gateway Timeout
             return
 
         content_encoding = res.headers.get('Content-Encoding', 'identity')
@@ -143,7 +148,7 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
                 res.headers['Content-Length'] = str(len(resdata))
             resbody = replaced_resbody
 
-        # RFC 2616 requirements
+        # follow RFC 2616 requirements
         self.remove_hop_by_hop_headers(res.headers)
         if self.timeout:
             res.headers['Connection'] = 'Keep-Alive'
@@ -170,17 +175,19 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
     def request_to_upstream_server(self, req, reqbody):
         u = urlsplit(req.path)
         origin = (u.scheme, u.netloc)
+
+        # An HTTP/1.1 proxy MUST ensure that any request message it forwards does contain 
+        # an appropriate Host header field that identifies the service being requested by the proxy. [RFC 2616]
         req.headers['Host'] = u.netloc
+        selector = "%s?%s" % (u.path, u.query) if u.query else u.path
 
         while True:
             with self.lock_origin(origin):
                 conn, timer = self.open_origin(origin)
-                selector = "%s?%s" % (u.path, u.query) if u.query else u.path
                 try:
                     conn.request(req.command, selector, reqbody, headers=dict(req.headers))
                 except socket.error:
-                    # Couldn't connect to the server.
-                    self.send_gateway_timeout()
+                    # Couldn't connect to the upstream server.
                     self.close_origin(origin)
                     raise
                 try:
@@ -232,17 +239,6 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
                 timer.cancel()
             conn.close()
             del self.conn_table[origin]['connection']
-
-    def send_gateway_timeout(self):
-        headers = {}
-        self.modify_via_header(headers)
-        headers['Connection'] = 'close'
-
-        self.send_response(504)
-        for k in headers:
-            self.send_header(k, headers[k])
-        self.end_headers()
-        self.wfile.write('504 Gateway Timeout')
 
     def remove_hop_by_hop_headers(self, headers):
         hop_by_hop_headers = ['Connection', 'Keep-Alive', 'Proxy-Authenticate', 'Proxy-Authorization', 'TE', 'Trailers', 'Trailer', 'Transfer-Encoding', 'Upgrade']
