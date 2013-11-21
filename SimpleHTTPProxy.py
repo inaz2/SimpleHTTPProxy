@@ -69,11 +69,16 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         # just provide a tunnel, transfer the data with no modification
         # override here if you need
 
-        if ':' in self.path:
-            address = self.path.split(':', 1)
-        else:
-            address = (self.path, 443)    # workaround
+        req = self
+        reqbody = None
+        req.path = "https://%s/" % req.path.replace(':443', '')
 
+        replaced_reqbody = self.request_handler(req, reqbody)
+        if replaced_reqbody is True:
+            return
+
+        u = urlsplit(req.path)
+        address = (u.hostname, u.port or 443)
         try:
             conn = socket.create_connection(address)
         except socket.error:

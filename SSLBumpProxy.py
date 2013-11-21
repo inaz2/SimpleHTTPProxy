@@ -8,20 +8,20 @@ class SSLBumpProxyHandler(SimpleHTTPProxyHandler):
     certfile = 'SSLBumpProxy/server.crt'
     timeout = None    # FIXME: SSL connection to the client needs to be closed every time
 
-    def do_CONNECT(self):
-        self.send_response(200, 'Connection Established')
-        self.end_headers()
+    def request_handler(self, req, reqbody):
+        if req.command == 'CONNECT':
+            self.send_response(200, 'Connection Established')
+            self.end_headers()
 
-        self.connection = ssl.wrap_socket(self.connection, keyfile=self.keyfile, certfile=self.certfile, server_side=True)
-        self.rfile = self.connection.makefile("rb", self.rbufsize)
-        self.wfile = self.connection.makefile("wb", self.wbufsize)
+            self.connection = ssl.wrap_socket(self.connection, keyfile=self.keyfile, certfile=self.certfile, server_side=True)
+            self.rfile = self.connection.makefile("rb", self.rbufsize)
+            self.wfile = self.connection.makefile("wb", self.wbufsize)
 
-        self.https_origin = "https://%s" % self.path.replace(':443', '')
-
-    def do_SPAM(self):
-        if hasattr(self, 'https_origin'):
-            self.path = self.https_origin + self.path
-        SimpleHTTPProxyHandler.do_SPAM(self)
+            self.https_origin = req.path.rstrip('/')
+            return True
+        else:
+            if hasattr(self, 'https_origin'):
+                req.path = self.https_origin + req.path
 
 
 if __name__ == '__main__':
