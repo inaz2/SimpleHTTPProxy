@@ -158,13 +158,13 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
             self.modify_via_header(res.headers)
 
         self.send_response(res.status, res.reason)
-        for k in res.headers:
+        for k, v in res.headers.items():
             if k == 'set-cookie':
                 # Origin servers SHOULD NOT fold multiple Set-Cookie header fields into a single header field. [RFC 6265]
-                for v in self.split_set_cookie_header(res.headers[k]):
-                    self.send_header(k, v)
+                for value in self.split_set_cookie_header(v):
+                    self.send_header(k, value)
             else:
-                self.send_header(k, res.headers[k])
+                self.send_header(k, v)
         self.end_headers()
 
         if self.command != 'HEAD':
