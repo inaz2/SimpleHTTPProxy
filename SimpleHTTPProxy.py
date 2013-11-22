@@ -100,6 +100,7 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
                 if data:
                     other.sendall(data)
                     keep_connection = True
+        conn.close()
 
     def do_HEAD(self):
         self.do_SPAM()
