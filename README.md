@@ -46,6 +46,7 @@ Some examples are included:
 - RemoveIframeProxy: remove all &lt;iframe&gt; elements from 'text/html' contents
 - StripAmazonProxy: force redirect to 'http://www.amazon.co.jp/dp/$ASIN' style url
 - CatHeadersProxy: print HTTP headers to stdout
+- SendSSTPProxy: send [SSTP](http://ja.wikipedia.org/wiki/Sakura_Script_Transfer_Protocol) messages to localhost
 
 You can use these proxies just as SimpleHTTPProxy:
 
