@@ -11,6 +11,7 @@ class SSLBumpProxyHandler(SimpleHTTPProxyHandler):
     def request_handler(self, req, reqbody):
         if req.command == 'CONNECT':
             self.send_response(200, 'Connection Established')
+            self.send_header('Connection', 'Keep-Alive')
             self.end_headers()
 
             self.connection = ssl.wrap_socket(self.connection, keyfile=self.keyfile, certfile=self.certfile, server_side=True)

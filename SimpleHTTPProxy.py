@@ -85,6 +85,7 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
             self.send_error(504)    # 504 Gateway Timeout
             return
         self.send_response(200, 'Connection Established')
+        self.send_header('Connection', 'close')
         self.end_headers()
 
         conns = [self.connection, conn]
