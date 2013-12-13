@@ -40,7 +40,7 @@ class SSLBumpProxyHandler(SimpleHTTPProxyHandler):
 
             self.https_origin = req.path.rstrip('/')
             return True
-        elif req.command == 'GET' and req.path == 'http://cacert.test/':
+        elif req.command == 'GET' and req.path == 'http://proxy.test/':
             with open(self.ca_certfile, 'rb') as f:
                 data = f.read()
 
