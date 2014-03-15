@@ -10,6 +10,7 @@ class SSLStripProxyHandler(SimpleHTTPProxyHandler):
     def request_handler(self, req, reqbody):
         # forward known https urls
         if req.path in self.forward_table:
+            req.requestline = req.requestline.replace(req.path, self.forward_table[req.path], 1)
             req.path = self.forward_table[req.path]
 
         return self.ssl_request_handler(req, reqbody)

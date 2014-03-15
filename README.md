@@ -65,7 +65,7 @@ SSLStripProxy inherits SimpleHTTPProxy and implements [sslstrip](http://www.thou
 
 Also some examples are included:
 
-- SSLStripSniffProxy: output POST parameters for login pages to stdout (also works via HTTP)
+- SSLStripCatHeadersProxy: print HTTP/HTTPS headers to stdout
 - OffmousedownGoogleProxy: disable onmousedown URL rewriting in Google's Result Pages (HTTPS)
 
 "HTTP Strict Transport Security" policies [RFC 6797] make the browsers always use HTTPS for their domains, so this proxy doesn't work for such cases.
@@ -81,7 +81,7 @@ SSLBumpProxy inherits SimpleHTTPProxy and implements [Squid's SslBump](http://wi
 
 An example is included:
 
-- SSLBurpSniffProxy: output POST parameters for login pages to stdout (also works via HTTP)
+- SSLBurpCatHeadersProxy: print HTTP/HTTPS headers to stdout
 
 To enable dynamic certificate generation, OpenSSL is required.
 If you use a static certificate, edit SSLBumpProxy.py.
