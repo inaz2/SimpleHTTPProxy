@@ -4,7 +4,7 @@ import sys
 import httplib
 from SocketServer import ThreadingMixIn
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
-from threading import Lock, RLock, Thread, Event
+from threading import Lock, RLock, Timer
 from cStringIO import StringIO
 from urlparse import urlsplit
 import socket
@@ -13,32 +13,6 @@ import gzip
 import zlib
 import re
 import traceback
-
-
-class RestartableTimer(Thread):
-    def __init__(self, interval, function, args=[], kwargs={}):
-        Thread.__init__(self)
-        self.interval = interval
-        self.function = function
-        self.args = args
-        self.kwargs = kwargs
-        self.finished = Event()
-        self.restarted = True
-
-    def cancel(self):
-        self.finished.set()
-
-    def run(self):
-        while self.restarted:
-            self.restarted = False
-            self.finished.wait(self.interval)
-        if not self.finished.is_set():
-            self.function(*self.args, **self.kwargs)
-        self.finished.set()
-
-    def restart(self):
-        self.restarted = True
-        self.finished.set()
 
 
 class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
@@ -190,7 +164,7 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
 
         while True:
             with self.lock_origin(origin):
-                conn, timer = self.open_origin(origin)
+                conn = self.open_origin(origin)
                 try:
                     conn.request(req.command, selector, reqbody, headers=dict(req.headers))
                 except socket.error:
@@ -209,10 +183,10 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
                         raise
                 resdata = res.read()
                 res.headers = res.msg    # so that res have the same attribute as req
-                if not timer or 'close' in res.headers.get('Connection', ''):
+                if not self.upstream_timeout or 'close' in res.headers.get('Connection', ''):
                     self.close_origin(origin)
                 else:
-                    timer.restart()
+                    self.reset_timer(origin)
             return res, resdata
 
     def lock_origin(self, origin):
@@ -222,28 +196,35 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         return d['rlock']
 
     def open_origin(self, origin):
-        if 'connection' in self.conn_table[origin]:
-            conn, timer = self.conn_table[origin]['connection']
-        else:
+        conn = self.conn_table[origin].get('connection')
+        if not conn:
             scheme, netloc = origin
             if scheme == 'https':
                 conn = httplib.HTTPSConnection(netloc)
             else:
                 conn = httplib.HTTPConnection(netloc)
-            if self.upstream_timeout:
-                timer = RestartableTimer(self.upstream_timeout, self.close_origin, args=[origin])
-                timer.daemon = True
-                timer.start()
-            else:
-                timer = None
-            self.conn_table[origin]['connection'] = (conn, timer)
-        return conn, timer
+            self.reset_timer(origin)
+            self.conn_table[origin]['connection'] = conn
+        return conn
+
+    def reset_timer(self, origin):
+        timer = self.conn_table[origin].get('timer')
+        if timer:
+            timer.cancel()
+        if self.upstream_timeout:
+            timer = Timer(self.upstream_timeout, self.close_origin, args=[origin])
+            timer.daemon = True
+            timer.start()
+        else:
+            timer = None
+        self.conn_table[origin]['timer'] = timer
 
     def close_origin(self, origin):
         with self.lock_origin(origin):
-            conn, timer = self.conn_table[origin]['connection']
+            timer = self.conn_table[origin]['timer']
             if timer:
                 timer.cancel()
+            conn = self.conn_table[origin]['connection']
             conn.close()
             del self.conn_table[origin]['connection']
 
