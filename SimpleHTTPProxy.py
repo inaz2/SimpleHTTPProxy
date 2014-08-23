@@ -4,7 +4,7 @@ import sys
 import httplib
 from SocketServer import ThreadingMixIn
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
-from threading import Lock, RLock, Timer
+from threading import Lock, Timer
 from cStringIO import StringIO
 from urlparse import urlsplit
 import socket
@@ -38,6 +38,11 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
     timeout = 2               # timeout with clients, set to None not to make persistent connection
     upstream_timeout = 115    # timeout with upstream servers, set to None not to make persistent connection
     proxy_via = None          # pseudonym of the proxy in Via header, set to None not to modify original Via header
+
+    def log_error(self, format, *args):
+        if format == "Request timed out: %r":
+            return
+        self.log_message(format, *args)
 
     def do_CONNECT(self):
         # just provide a tunnel, transfer the data with no modification
@@ -191,9 +196,9 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
 
     def lock_origin(self, origin):
         d = self.conn_table.setdefault(origin, {})
-        if not 'rlock' in d:
-            d['rlock'] = RLock()
-        return d['rlock']
+        if not 'lock' in d:
+            d['lock'] = Lock()
+        return d['lock']
 
     def open_origin(self, origin):
         conn = self.conn_table[origin].get('connection')
@@ -220,13 +225,12 @@ class SimpleHTTPProxyHandler(BaseHTTPRequestHandler):
         self.conn_table[origin]['timer'] = timer
 
     def close_origin(self, origin):
-        with self.lock_origin(origin):
-            timer = self.conn_table[origin]['timer']
-            if timer:
-                timer.cancel()
-            conn = self.conn_table[origin]['connection']
-            conn.close()
-            del self.conn_table[origin]['connection']
+        timer = self.conn_table[origin]['timer']
+        if timer:
+            timer.cancel()
+        conn = self.conn_table[origin]['connection']
+        conn.close()
+        del self.conn_table[origin]['connection']
 
     def remove_hop_by_hop_headers(self, headers):
         hop_by_hop_headers = ['Connection', 'Keep-Alive', 'Proxy-Authenticate', 'Proxy-Authorization', 'TE', 'Trailers', 'Trailer', 'Transfer-Encoding', 'Upgrade']
