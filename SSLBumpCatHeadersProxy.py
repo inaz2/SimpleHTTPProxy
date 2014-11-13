@@ -19,7 +19,8 @@ class SSLBumpCatHeadersProxyHandler(SSLBumpProxyHandler):
 %s %d %s
 %s
 """ % (req.requestline, str(req.headers), reqbody, self.version_table[res.version], res.status, res.reason, str(res.headers))
-        print text.replace('\n', '\x1bE')    # use NEL control character for line break (useful for grep)
+        # print text.replace('\n', '\x1bE')    # use NEL control character for line break (useful for grep)
+        print text
         sys.stdout.flush()
 
 
