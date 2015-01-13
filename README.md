@@ -1,3 +1,8 @@
+# This repository is NOT MAINTAINED anymore!
+
+Use [proxy2](https://github.com/inaz2/proxy2) instead.
+
+
 # SimpleHTTPProxy
 
 A Simple HTTP Proxy like Python's SimpleHTTPServer module.
