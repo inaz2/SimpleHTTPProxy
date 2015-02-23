@@ -4,6 +4,7 @@ from SimpleHTTPProxy import SimpleHTTPProxyHandler, test
 import ssl
 import os
 import urlparse
+import time
 from subprocess import Popen, PIPE
 
 class SSLBumpProxyHandler(SimpleHTTPProxyHandler):
@@ -28,8 +29,9 @@ class SSLBumpProxyHandler(SimpleHTTPProxyHandler):
                 certpath = "%s/%s.crt" % (self.dynamic_certdir.rstrip('/'), u.hostname)
                 with self.global_lock:
                     if not os.path.isfile(certpath):
+                        epoch = "%d" % (time.time() * 1000)
                         p1 = Popen(["openssl", "req", "-new", "-key", self.keyfile, "-subj", "/CN=%s" % u.hostname], stdout=PIPE)
-                        p2 = Popen(["openssl", "x509", "-req", "-days", "3650", "-CA", self.ca_certfile, "-CAkey", self.ca_keyfile, "-CAcreateserial", "-out", certpath], stdin=p1.stdout, stderr=PIPE)
+                        p2 = Popen(["openssl", "x509", "-req", "-days", "3650", "-CA", self.ca_certfile, "-CAkey", self.ca_keyfile, "-set_serial", epoch, "-out", certpath], stdin=p1.stdout, stderr=PIPE)
                         p1.stdout.close()
                         p2.communicate()
                 self.connection = ssl.wrap_socket(self.connection, keyfile=self.keyfile, certfile=certpath, server_side=True)
